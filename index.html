@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>HydroBuddy — Daily Water Tracker</title>
+  <meta name="description" content="Lightweight hydration tracker. Your data stays in your browser."/>
+  <style>
+    :root{
+      --bg:#f6fbff; --fg:#0f172a; --muted:#64748b; --card:#ffffff; --line:#e2e8f0;
+      --primary:#0ea5e9; --primary-600:#0284c7; --good:#10b981; --ring:#bae6fd;
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
+      color:var(--fg); background:linear-gradient(#edfaff, #fff);
+    }
+    .container{max-width:980px;margin:0 auto;padding:16px 16px 40px}
+    header{display:flex;align-items:center;justify-content:space-between;padding:8px 0 12px}
+    h1{margin:0;font-size:22px;display:flex;gap:8px;align-items:center}
+    .muted{color:var(--muted)}
+    .grid{display:grid;gap:16px}
+    @media(min-width:900px){ .grid{grid-template-columns: 1.6fr 1fr} }
+    .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 6px 20px rgba(2,16,28,.05)}
+    .card .p{padding:16px}
+    .title{font-weight:600;margin:0 0 4px}
+    .desc{margin:0;color:var(--muted);font-size:14px}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .btn{border:1px solid var(--line);background:#fff;border-radius:14px;padding:10px 12px;cursor:pointer;
+         box-shadow:0 2px 0 rgba(2,16,28,.05);font-weight:600}
+    .btn:hover{background:#f8fafc}
+    .btn.primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+    .btn.primary:hover{background:var(--primary-600)}
+    .btn.ghost{background:#fff;border-color:#dbeafe}
+    input[type="number"], input[type="text"]{
+      height:42px;padding:0 12px;border-radius:12px;border:1px solid var(--line);outline:none;
+    }
+    input:focus{box-shadow:0 0 0 4px var(--ring);border-color:#93c5fd}
+    .chip{border:1px solid var(--line);padding:6px 10px;border-radius:999px;font-size:13px}
+    .chips{display:flex;flex-wrap:wrap;gap:8px}
+    .progress{width:100%;height:12px;background:#e2e8f0;border-radius:999px;overflow:hidden}
+    .bar{height:100%;background:linear-gradient(90deg, var(--primary), #22d3ee);width:0%}
+    .section{padding:10px 0}
+    .right .card + .card{margin-top:16px}
+    .streak{font-weight:700}
+    footer{margin-top:20px;text-align:center;font-size:12px;color:#94a3b8}
+    .confetti{
+      position:relative; background:linear-gradient(90deg,#ecfeff,#ecfdf5); color:#065f46;
+      border:1px dashed #99f6e4; border-radius:14px; padding:10px; text-align:center; font-weight:700
+    }
+    .confetti::after{
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background:
+        radial-gradient(circle,#06b6d4 28%,transparent 29%) 4px 6px/16px 16px,
+        radial-gradient(circle,#a7f3d0 28%,transparent 29%) 12px -2px/18px 18px,
+        radial-gradient(circle,#60a5fa 28%,transparent 29%) 0 0/14px 14px;
+      opacity:.5;
+      animation:pop 1s ease forwards;
+    }
+    @keyframes pop{from{transform:scale(.98);opacity:0} to{transform:scale(1);opacity:.7}}
+    canvas{width:100%;height:180px;border-radius:12px;border:1px solid var(--line);background:#fff}
+    .small{font-size:12px;color:var(--muted)}
+    .sp{height:8px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>💧 HydroBuddy</h1>
+      <div class="row" style="gap:8px">
+        <button id="settingsBtn" class="btn ghost">Settings</button>
+        <button id="resetBtn" class="btn">Reset Today</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="left">
+        <div class="card">
+          <div class="p">
+            <p class="title">Today's Goal</p>
+            <p class="desc">Track your sips and watch the bar fill up.</p>
+
+            <div class="section row">
+              <div>
+                <div class="small">Date</div>
+                <div id="todayDate" style="font-weight:600"></div>
+              </div>
+              <div style="text-align:right">
+                <div class="small">Remaining</div>
+                <div id="remaining" style="font-weight:600"></div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="progress"><div id="bar" class="bar"></div></div>
+              <div class="row small" style="margin-top:6px">
+                <span>Progress</span><span id="percent" style="font-weight:700">0%</span>
+              </div>
+            </div>
+
+            <div class="section row" style="gap:10px;flex-wrap:wrap">
+              <button class="btn" data-add="250">+ 250 ml</button>
+              <button class="btn" data-add="350">+ 350 ml</button>
+              <button class="btn" data-add="500">+ 500 ml</button>
+              <button class="btn" data-add="750">+ 750 ml</button>
+            </div>
+
+            <div class="section row">
+              <input id="customMl" type="number" min="0" placeholder="Custom (ml)" style="width:140px"/>
+              <button id="addCustom" class="btn primary">Add</button>
+            </div>
+
+            <div class="section">
+              <div class="small" style="font-weight:600;margin-bottom:6px">Today's entries</div>
+              <div id="entries" class="chips"></div>
+            </div>
+
+            <div id="celebrate" class="section confetti" style="display:none">🎉 Goal reached — nice work!</div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="card">
+          <div class="p">
+            <p class="title">Last 7 days</p>
+            <p class="desc">Your consistency at a glance.</p>
+            <div class="sp"></div>
+            <canvas id="chart" width="600" height="180" aria-label="Last 7 days chart"></canvas>
+            <div class="small">Dashed line marks your daily goal.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="p">
+            <p class="title">Streaks & Tips</p>
+            <p class="desc">Stay hydrated like a pro runner.</p>
+            <div class="sp"></div>
+            <div><span class="streak" id="streak">0</span> day streak</div>
+            <ul class="small">
+              <li>Sip regularly — roughly 200 ml each awake hour.</li>
+              <li>Before runs: 500–700 ml 2–3 h prior; 200–300 ml 30 min prior.</li>
+              <li>Long runs: 400–800 ml/h plus 300–500 mg sodium/h.</li>
+              <li>After sweaty sessions: replace ~150% of weight lost.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card" id="settings" style="display:none">
+          <div class="p">
+            <p class="title">Settings</p>
+            <div class="section row">
+              <label class="small" for="goal">Daily goal (ml)</label>
+              <input id="goal" type="number" min="500" step="50" style="width:120px"/>
+            </div>
+            <div class="section row">
+              <label class="small" for="unitLiters">Show liters</label>
+              <input id="unitLiters" type="checkbox"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>Built with 💧 by HydroBuddy. Your data stays in your browser.</footer>
+  </div>
+
+<script>
+(function(){
+  const ML_DEFAULT = 3500;
+  const STORAGE_KEY = "hydrobuddy_static_v1";
+  const todayKey = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  };
+  const $ = (id)=>document.getElementById(id);
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");
+  let goal = typeof saved.goal==="number" ? saved.goal : ML_DEFAULT;
+  let unitLiters = !!saved.unitLiters;
+  let history = saved.history || {};
+  let today = todayKey();
+  if(!history[today]) history[today] = { total:0, goal, entries:[] };
+
+  const els = {
+    date: $("todayDate"),
+    remaining: $("remaining"),
+    bar: $("bar"),
+    percent: $("percent"),
+    entries: $("entries"),
+    chart: $("chart"),
+    streak: $("streak"),
+    goal: $("goal"),
+    unit: $("unitLiters"),
+    settings: $("settings"),
+    settingsBtn: $("settingsBtn"),
+    resetBtn: $("resetBtn"),
+    addCustom: $("addCustom"),
+    customMl: $("customMl"),
+    celebrate: $("celebrate"),
+  };
+
+  function mlToL(ml){ return (ml/1000).toFixed(2)+" L"; }
+  function fmt(ml){ return unitLiters ? mlToL(ml) : (ml+" ml"); }
+  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({goal, unitLiters, history})); }
+  function time(ts){ return new Date(ts).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
+
+  function ensureToday(){
+    const k = todayKey();
+    if(k!==today){ today = k; if(!history[today]) history[today] = { total:0, goal, entries:[] }; }
+  }
+
+  function render(){
+    ensureToday();
+    const day = history[today];
+    els.date.textContent = today;
+    const remaining = Math.max(0,(day.goal||goal) - day.total);
+    els.remaining.textContent = fmt(remaining);
+    const pct = Math.min(100, Math.round( (day.total / (day.goal||goal))*100 ));
+    els.bar.style.width = pct + "%";
+    els.percent.textContent = pct + "%";
+
+    els.entries.innerHTML = "";
+    for(const e of (day.entries||[])){
+      const span=document.createElement("span");
+      span.className="chip";
+      span.textContent = fmt(e.ml) + " • " + time(e.ts);
+      els.entries.appendChild(span);
+    }
+    // celebration
+    els.celebrate.style.display = (day.total >= (day.goal||goal)) ? "block":"none";
+
+    // 7-day data
+    const last7 = [];
+    for(let i=6;i>=0;i--){
+      const d = new Date(); d.setDate(d.getDate()-i);
+      const k = d.toISOString().slice(0,10);
+      const rec = history[k];
+      last7.push({label: k.slice(5), total: rec?rec.total:0, goal: (rec?rec.goal:goal)});
+    }
+    drawChart(els.chart, last7, goal);
+    // streak
+    els.streak.textContent = calcStreak();
+    // settings values
+    els.goal.value = goal;
+    els.unit.checked = unitLiters;
+  }
+
+  function addWater(ml){
+    ensureToday();
+    const day = history[today];
+    day.total += ml;
+    (day.entries ||= []).push({ ml, ts:Date.now() });
+    save(); render();
+  }
+
+  function resetToday(){
+    history[today] = { total:0, goal, entries:[] };
+    save(); render();
+  }
+
+  function calcStreak(){
+    let s=0;
+    for(let i=0;i<30;i++){
+      const d = new Date(); d.setDate(d.getDate()-i);
+      const k = d.toISOString().slice(0,10);
+      const rec = history[k];
+      const g = (rec && rec.goal) ? rec.goal : goal;
+      if(rec && rec.total >= g) s++; else break;
+    }
+    return s;
+  }
+
+  function drawChart(canvas, data, goalLine){
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+    // axes
+    ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(30,10); ctx.lineTo(30,H-20); ctx.lineTo(W-10,H-20); ctx.stroke();
+
+    const maxVal = Math.max(goalLine, ...data.map(d=>d.total), 1000);
+    const chartW = W-50, chartH = H-40;
+    const barW = chartW / data.length - 10;
+
+    // goal dashed line
+    const gy = H-20 - (goalLine/maxVal)*chartH;
+    ctx.setLineDash([5,5]); ctx.strokeStyle="#94a3b8";
+    ctx.beginPath(); ctx.moveTo(30,gy); ctx.lineTo(W-10,gy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // bars
+    data.forEach((d, i)=>{
+      const x = 40 + i*(barW+10);
+      const h = (d.total/maxVal)*chartH;
+      const y = H-20 - h;
+      // bar
+      const grd = ctx.createLinearGradient(0,y,0,H);
+      grd.addColorStop(0,"#0ea5e9"); grd.addColorStop(1,"#22d3ee");
+      ctx.fillStyle = grd;
+      const r = 6; // rounded top
+      const w = barW;
+      // draw rounded top rect
+      ctx.beginPath();
+      ctx.moveTo(x, y+r);
+      ctx.arcTo(x, y, x+r, y, r);
+      ctx.lineTo(x+w-r, y);
+      ctx.arcTo(x+w, y, x+w, y+r, r);
+      ctx.lineTo(x+w, H-20);
+      ctx.lineTo(x, H-20);
+      ctx.closePath();
+      ctx.fill();
+
+      // label
+      ctx.fillStyle="#475569"; ctx.font="12px system-ui";
+      ctx.textAlign="center";
+      ctx.fillText(d.label, x+w/2, H-6);
+    });
+  }
+
+  // wire up
+  document.querySelectorAll("[data-add]").forEach(btn=>{
+    btn.addEventListener("click", ()=> addWater(parseInt(btn.getAttribute("data-add"),10)||0));
+  });
+  const els2 = {};
+  const elsRef = {
+    addCustom: "addCustom",
+    customMl: "customMl",
+    resetBtn: "resetBtn",
+    settingsBtn: "settingsBtn",
+    goal: "goal",
+    unit: "unitLiters",
+  };
+  for (const k in elsRef) els2[k] = document.getElementById(elsRef[k]);
+
+  els2.addCustom.addEventListener("click", ()=>{
+    const amt = parseInt(els2.customMl.value,10)||0;
+    if(amt>0) addWater(amt);
+  });
+  els2.resetBtn.addEventListener("click", resetToday);
+  els2.settingsBtn.addEventListener("click", ()=>{
+    const s = document.getElementById("settings");
+    s.style.display = (s.style.display==="none")?"block":"none";
+  });
+  els2.goal.addEventListener("change", ()=>{
+    goal = parseInt(els2.goal.value,10)||ML_DEFAULT;
+    if(history[today]) history[today].goal = goal;
+    save(); render();
+  });
+  els2.unit.addEventListener("change", ()=>{
+    unitLiters = !!els2.unit.checked; save(); render();
+  });
+
+  // initial render
+  render();
+  // watch date changes
+  setInterval(()=>{ render(); }, 30000);
+})();
+</script>
+</body>
+</html>
